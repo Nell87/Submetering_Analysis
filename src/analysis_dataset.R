@@ -64,16 +64,18 @@ data %<>% select(-X, -Time)
 #### C. MISSING VALUES & DAYLIGHT SAVING   ---------------------
 
 # Daylight saving time__________________________________________________
-# DST_dates<-data.frame(Start=c( "2007-3-25 02:00:00", "2008-3-30 02:00:00","2009-3-29 02:00:00","2010-3-28 02:00:00"),
-#                       End=c( "2007-10-28 1:59:00", "2008-10-26 1:59:00","2009-10-25 1:59:00", "2010-10-31 1:59:00") ,stringsAsFactors=FALSE)
-# DST_dates$Start<-as_datetime(DST_dates$Start)
-# DST_dates$End<-as_datetime(DST_dates$End)
-# 
-# Data<-Data %>%
-#   mutate(DateTime = ifelse(Data$DateTime %in% unlist(Map(`:`, DST_dates$Start, DST_dates$End)),
-#                            DateTime +3600, DateTime))
-# 
-# Data$DateTime<-as_datetime(Data$DateTime,origin= "1970-01-01", tz="UTC")
+DST_dates<-data.frame(Start=c( "2007-3-25 02:00:00", "2008-3-30 02:00:00","2009-3-29 02:00:00","2010-3-28 02:00:00"),
+                     End=c( "2007-10-28 1:59:00", "2008-10-26 1:59:00","2009-10-25 1:59:00", "2010-10-31 1:59:00") ,stringsAsFactors=FALSE)
+DST_dates$Start<-as_datetime(DST_dates$Start)
+DST_dates$End<-as_datetime(DST_dates$End)
+ 
+data<-data %>%
+  mutate(DateTime = ifelse(data$DateTime %in% unlist(Map(`:`, DST_dates$Start, DST_dates$End)),
+                            DateTime +3600, DateTime))
+ 
+data$DateTime<-as_datetime(data$DateTime,origin= "1970-01-01", tz="UTC")
+
+rm(DST_dates)
 
 # Exploring missing values _________________________________________________
 #Download the 'calendarHeat' function from revolutionanalytics.com
@@ -90,23 +92,36 @@ Data_ByDayts<-data[group_bytime_variables] %>%
   ungroup()
 
 plotNA.distribution(Data_ByDayts$ActiveEnergy)
-rm(Data_ByDayts,group_bytime_variables)
+rm(Data_ByDayts,group_bytime_variables, calendarHeat)
 
 # Group the missing values per type ____________________________________
+
+# We create a table with the missing values
 missingdata<-data %>%
-  mutate(MissingYesNo=ifelse(is.na(ActiveEnergy)==TRUE, 1, 0))%>%
-  
-  # Grouping consecutive values
-  mutate(GroupsMissing=cumsum(c(1, diff(MissingYesNo) != 0))) %>%
-  select(DateTime,ActiveEnergy, MissingYesNo, GroupsMissing) %>%
-  group_by(MissingYesNo, GroupsMissing) %>% dplyr::mutate(count = n()) %>%
-  
-  # Filter the missing values 
-  dplyr::filter(MissingYesNo==1) 
+  filter(is.na(ActiveEnergy)) %>%
+  select(DateTime, ActiveEnergy)
 
-# CREATE A FUNCTION FOR REPLACING THE MISSING VALUES 
+# Let's see how many consecutive values we have
+number_na=1
+missingdata$number_na<-number_na
 
-rm(missingdata)
+for (i in 2:nrow(missingdata)){
+  
+  if (lag(missingdata$DateTime)[i] == (missingdata$DateTime[i] -60 )){
+    
+    number_na <- number_na +1
+    missingdata$number_na[i]<- number_na
+  }
+  
+  else {
+    number_na= 1
+    missingdata$number_na[i] <- number_na
+    
+  }
+}
+
+# Replace the missing values depending on the type (<30 o >30) - IN DEVELOPMENT- 
+rm(missingdata, i, number_na)
 
 # Filling Missing values ______________________________________________
 data<-arrange(data, DateTime)
@@ -117,11 +132,32 @@ interp_var<-c("ActiveEnergy", "ReactiveEnergy", "Voltage", "Intensity","Kitchen"
 data[,interp_var]<-lapply(data[,interp_var], forecast::na.interp)
 
 sapply(data, function(x)sum(is.na(x)))  # 25,691 to 0
+rm(interp_var)
 
 #### D. ADDING SEASON & OTHER VARIABLES -----------------------------------
 # Season __________________________________________________________________
+winter<-as_date("2008-12-21")
+spring <- as_date("2008-03-20")
+summer <- as_date("2008-06-21")
+fall <- as_date("2008-09-22")
 
-# Other variables __________________________________________________________________
+# We remove year 2006
+data<-data %>%
+  filter(year(DateTime) != 2006)
+
+mydates <- as_date(format(data$Date, "%2008-%m-%d"))
+
+data$Season<-ifelse(mydates >= as_date(spring) & mydates < as_date(summer), "spring",
+                    ifelse (mydates >= summer & mydates < fall, "summer",
+                            ifelse (mydates >= fall & mydates < winter, "fall",
+                                    "winter")))
+
+data<-data %>% mutate(Season= as.factor(Season))
+rm(fall, spring, summer, winter, mydates)
+
+# Other variables _________________________________________________________ - IN DEVELOPMENT- 
+# Adding day of the week
+data$Wday<-lubridate::wday(data$DateTime, label=TRUE, abbr=TRUE)
 
 # We create two new variables: Other_Places (the active energy consumed in other places) 
 # and Power_Factor (the efficiency of electric system)
@@ -129,9 +165,6 @@ data<-data %>% mutate(OtherRooms = ActiveEnergy - Kitchen - Laundry - EWAC)
 data<-data %>% mutate(PowerFactor = ActiveEnergy/(Voltage*Intensity))
 
 #### D. GROUPING & TIME SERIES ---------------------
-# Remove 2006 _____________________________________________________________
-data<-data %>% dplyr::filter(Date >= as_date("2007-01-01"))
-
 # Grouping in different granularities _____________________________________
 group_bytime_variables<-c("DateTime", "ActiveEnergy", "ReactiveEnergy", 
                           "Kitchen", "Laundry", "EWAC")
@@ -170,7 +203,7 @@ mstsMonth<-msts(data_bymonths$ActiveEnergy,seasonal.periods=c(1,12))
 x<-tsMonth %>% stl(s.window="periodic") %>% autoplot() 
 mstsMonth %>% mstl(s.window="periodic") %>% autoplot() 
 
-x# TS & MSTS per Day (Active Energy) ________________________________________
+# TS & MSTS per Day (Active Energy) ________________________________________
 tsDay<-ts(data_bydays$ActiveEnergy, frequency = 356.25, start=c(2007,1)) 
 mstsDay<-msts(data_bydays$ActiveEnergy, seasonal.periods = c(7,365.25))
 
