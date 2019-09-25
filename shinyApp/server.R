@@ -28,21 +28,25 @@ data_bydays<-data%>%
   group_by(Year=year(DateTime), Month=month(DateTime, label=TRUE, abbr=FALSE),
            Week=week(DateTime),Day=day(DateTime)) %>%
   summarise_at(vars(vars), funs(sum)) %>%
-  mutate(Date=ymd(paste(Year, Month, Day)))
+  mutate(Date=ymd(paste(Year, Month, Day))) %>% 
+  ungroup()
 
 data_bydays<-merge(data_bydays, prices,  by=c("Year","Month"))
 
 data_byweeks<-data_bydays%>%
   group_by(Year, Month, Week)%>%
-  summarise_at(vars(vars), funs(sum))
+  summarise_at(vars(vars), funs(sum)) %>% 
+  ungroup()
 
 data_bymonths<-data%>%
   group_by(Year=year(DateTime), Month=month(DateTime, label=TRUE, abbr=FALSE))%>%
-  summarise_at(vars(vars), funs(sum))
+  summarise_at(vars(vars), funs(sum))%>% 
+  ungroup()
 
 data_byyears<-data%>%
   group_by(Year=year(DateTime))%>%
-  summarise_at(vars(vars), funs(sum))
+  summarise_at(vars(vars), funs(sum))%>% 
+  ungroup()
 
 # Create time series
 tsYear<-ts(data_byyears[vars],frequency=1, start=2007, end=2010)
@@ -55,10 +59,15 @@ rm(vars)
 
 server <- function(input, output, session) {
   
-  # PREPARE THE DATASET
+  # OBJECTS FOR CUSTOMER
   cust_data<-reactive({
     data_bydays %>% filter(Month %in% input$cust_month & Year %in% input$cust_year) %>%
       select(Day, Month, Year, Variable=starts_with(input$cust_var))
+  })
+  
+  cust_energy_thismonth<-reactive({
+    data_bymonths %>% filter(Month %in% input$cust_month & Year %in% input$cust_year) %>%
+    select(Variable=starts_with(input$cust_var))
   })
   
   # CUSTOMER: TOTAL CONSUMPTION  
@@ -71,7 +80,50 @@ server <- function(input, output, session) {
       
   })  
   
+  # CUSTOMER: BOXES
+  output$box_total_energy<-renderInfoBox({
+    infoBox(
+      "Total Energy", "80%", icon = icon("lightbulb"),
+      color = "blue"
+    )
+  })
+    
+    output$box_total_money<-renderInfoBox({
+      infoBox(
+        "Total Money", "80%", icon = icon("euro-sign"),
+        color = "blue"
+      )
+    
+  })
+    
+    output$box_comp_lastmonth<-renderInfoBox({
+      cust_energy_thismonth<-cust_energy_thismonth()
+      
+      past<-data_bymonths %>% filter(lead(Month %in% input$cust_month) & Year %in% input$cust_year) %>%
+        select(Variable=starts_with(input$cust_var))
+      
+      color="green"
+      if(cust_energy_thismonth>past) color="red"
+      
+      infoBox(
+        "Last Month", "80%", icon = icon("arrow-down"),
+        color = color
+      )
+      
+    })
+    
+    output$box_comp_lastyear<-renderInfoBox({
+
+      infoBox(
+        "Last January", "80%", icon = icon("arrow-up"),
+        color = "red"
+      )
+      
+    })
+  
 }
+
+shinyApp(ui, server)
 
 
 # server <- function(input, output, session) {
