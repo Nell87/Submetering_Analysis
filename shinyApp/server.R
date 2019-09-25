@@ -123,8 +123,6 @@ server <- function(input, output, session) {
   
 }
 
-shinyApp(ui, server)
-
 
 # server <- function(input, output, session) {
 #   
