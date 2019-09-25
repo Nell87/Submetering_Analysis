@@ -78,7 +78,7 @@ ui <- dashboardPage(
                          startExpanded = FALSE,
                          # selectInput(inputId = "VariableAnalyst", label = "Variable",
                          #             choices=c("ActiveEnergy", "Kitchen", "Laundry", "EWAC")),
-                         menuSubItem("Predictions", tabName = "cust_predictions", selected = TRUE)
+                         menuSubItem("Predictions", tabName = "cust_predictions")
 
                 )
     )
