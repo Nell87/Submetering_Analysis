@@ -6,8 +6,8 @@ library(shiny)
 #library(bsts)
 library(readr)
 library(shinydashboard)
-# library(xts)
-# library(highcharter)
+library(xts)
+library(highcharter)
 library(dplyr)
 library(lubridate)
 library(plotly)
@@ -75,53 +75,85 @@ server <- function(input, output, session) {
     cust_data<-cust_data()
     plot_ly(x=~cust_data$Day, y=~cust_data$Variable, type="bar") %>%
       layout(title = "Total consumption",
-             xaxis = list(title = as.character(input$cust_var)),
-             yaxis = list(title = "Day"))
+             yaxis = list(title = as.character(input$cust_var)),
+             xaxis = list(title = "Day"))
       
   })  
   
   # CUSTOMER: BOXES
+  # Total Energy
   output$box_total_energy<-renderInfoBox({
+    cust_energy_thismonth<-cust_energy_thismonth()
+    
     infoBox(
-      "Total Energy", "80%", icon = icon("lightbulb"),
-      color = "blue"
+      tags$p("Energy",style = "font-size: 80%;"), 
+      paste(round(cust_energy_thismonth/1000,2), "Kw"), icon = icon("lightbulb"),
+      color = "blue", fill=TRUE
     )
   })
     
+  # Total Money
     output$box_total_money<-renderInfoBox({
+      cust_energy_thismonth<-cust_energy_thismonth()
+      
       infoBox(
-        "Total Money", "80%", icon = icon("euro-sign"),
-        color = "blue"
+        tags$p("Money",style = "font-size: 80%;"), 
+        paste(round(cust_energy_thismonth*0.000108500,2), "€"), icon = icon("euro-sign"),
+        color = "blue", fill=TRUE
       )
     
   })
     
+    # Comparing with the last month
     output$box_comp_lastmonth<-renderInfoBox({
       cust_energy_thismonth<-cust_energy_thismonth()
       
-      past<-data_bymonths %>% filter(lead(Month %in% input$cust_month) & Year %in% input$cust_year) %>%
+      past<-data_bymonths %>% filter(lead(Month %in% input$cust_month & Year %in% input$cust_year)) %>%
         select(Variable=starts_with(input$cust_var))
       
       color="green"
-      if(cust_energy_thismonth>past) color="red"
+      icon="arrow-down"
+      if(cust_energy_thismonth>past) color="red" 
+      if(cust_energy_thismonth>past) icon="arrow-up"
       
       infoBox(
-        "Last Month", "80%", icon = icon("arrow-down"),
+        title= tags$p("Last month",style = "font-size: 80%;"), 
+        paste(round(past*0.000108500,2), "€"), icon = icon(icon),color = color
+      )
+      
+    })
+    
+    # Comparing with the last similar month
+    output$box_comp_lastyear<-renderInfoBox({
+      cust_energy_thismonth<-cust_energy_thismonth()
+    
+      past<-data_bymonths %>% filter(Month %in% input$cust_month & Year %in% (as.numeric(input$cust_year)-1)) %>%
+        select(Variable=starts_with(input$cust_var))
+      
+      color="green"
+      icon="arrow-down"
+      if(cust_energy_thismonth>past) color="red" 
+      if(cust_energy_thismonth>past) icon="arrow-up"
+      
+      infoBox(
+        title=tags$p(paste("Last",input$cust_month),style = "font-size: 80%;"), 
+        value=paste(round(past*0.000108500,2), "€"), icon = icon(icon),
         color = color
       )
       
     })
     
-    output$box_comp_lastyear<-renderInfoBox({
-
-      infoBox(
-        "Last January", "80%", icon = icon("arrow-up"),
-        color = "red"
-      )
-      
+    output$cust_all<-renderHighchart({
+          dfts <- xts(round(data_bydays$ActiveEnergy,2), zoo::as.Date( data_bydays$Date, format='%m/%d/%Y'))
+    hchart(dfts) %>%
+      hc_title(text = "Energy consumption (Watt-hour)", align="center") %>%
+      hc_add_theme(hc_theme_538())
     })
+    
+
   
 }
+
 
 
 # server <- function(input, output, session) {

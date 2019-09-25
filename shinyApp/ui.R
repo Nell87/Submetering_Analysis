@@ -6,11 +6,12 @@ library(shiny)
 #library(bsts)
 library(readr)
 library(shinydashboard)
-# library(xts)
-# library(highcharter)
+library(xts)
+library(highcharter)
 library(dplyr)
 library(lubridate)
 library(plotly)
+
 
 #### 1. LOAD OBJECTS ####
 # Prepared data
@@ -97,21 +98,28 @@ ui <- dashboardPage(
               ),
               
               column(width=3,
-                     infoBoxOutput("box_total_energy", width=12),
+                     infoBoxOutput("box_total_money",width=12),
                      infoBoxOutput("box_comp_lastmonth",width=12)
               ),
               
               column(width=3,
-                     infoBoxOutput("box_total_money",width=12),
+                     infoBoxOutput("box_total_energy", width=12),
                      infoBoxOutput("box_comp_lastyear",width=12)
                      
                      
               )
                      
-            )
+            ),
             
-            # SECOND ROW
-        
+            #SECOND ROW
+            fluidRow(
+
+              highchartOutput("cust_all")
+            )
+              
+            
+    
+            
     ),
     
     tabItem(tabName = "AnTimeSeries",
