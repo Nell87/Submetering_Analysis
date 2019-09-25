@@ -11,12 +11,11 @@ library(highcharter)
 library(dplyr)
 library(lubridate)
 library(plotly)
+library(forecast)
 
 #### 1. LOAD OBJECTS ####
 # Prepared data
 data<-readRDS("data.rds")
-ListGraphsMonths<- readRDS("ListGraphMonths.rds")
-ListGraphsWeeks<- readRDS("ListGraphsWeeks.rds")
 prices <- read_excel("Electricity_prices.xlsx")
 prices <-data.frame(prices)
 prices$Month<-month(prices$Month, label=TRUE, abbr=FALSE)
@@ -49,12 +48,33 @@ data_byyears<-data%>%
   ungroup()
 
 # Create time series
-tsYear<-ts(data_byyears[vars],frequency=1, start=2007, end=2010)
-tsMonth<-ts(data_bymonths[vars],frequency =  12, start=c(2007,1),  end=c(2010,11))
-tsWeek<-ts(data_byweeks[vars], frequency = 52, start=c(2007,1),    end=c(2010,48))
-tsDay<-ts(data_bydays[c(vars, "Price")], frequency = 356, start=c(2007,1),    end=c(2010,300))
+# tsYear<-ts(data_byyears[vars],frequency=1, start=2007, end=2010)
+  tsMonth<-ts(data_bymonths["ActiveEnergy"],frequency =  12, start=c(2007,1),  end=c(2010,11))
+# tsWeek<-ts(data_byweeks[vars], frequency = 52, start=c(2007,1),    end=c(2010,48))
+# tsDay<-ts(data_bydays[c(vars, "Price")], frequency = 356, start=c(2007,1),    end=c(2010,300))
 rm(vars)
 
+#### 2. Forecasting ####
+# Creating train & Test
+ActiveMonth_train<-window(tsMonth, end=c(2010,1))
+ActiveMonth_test<-window(tsMonth, start=c(2010,2))
+
+ActiveMonth_HW <- HoltWinters(ActiveMonth_train,  seasonal = "additive")
+ActiveMonth_HW_pred <- forecast(ActiveMonth_HW, h=10, level = .95)
+
+# ARIMA _____________________________________________________________________
+ActiveMonth_ARIMA <- auto.arima(ActiveMonth_train)
+ActiveMonth_ARIMA_pred <- forecast(ActiveMonth_ARIMA, h=10, level = 0.95)
+mean(ActiveMonth_ARIMA_pred$upper - ActiveMonth_ARIMA_pred$lower)
+
+ActiveMonth_HW_Error<-accuracy(ActiveMonth_HW_pred,ActiveMonth_test)
+ActiveMonth_Arima_Error<-accuracy(ActiveMonth_ARIMA_pred,ActiveMonth_test)
+
+HW_finalmodel<-HoltWinters(tsMonth)
+ARIMAfinalmodel<-auto.arima(tsMonth)
+
+HW_finalpredictions<-forecast(HW_finalmodel, h=12, level = 0.95)
+ARIMA_finalpredictions<-forecast(ARIMAfinalmodel, h=12, level = 0.95)
 #### 3.  SERVER ####
 
 server <- function(input, output, session) {
@@ -150,10 +170,24 @@ server <- function(input, output, session) {
       hc_add_theme(hc_theme_538())
     })
     
-
+    # ANALYST: MODELS  
+    # Ploting predictions 
+    output$analyst_plot<-renderHighchart({
+      
+      highchart(type = "stock") %>% 
+        hc_add_series(round(tsMonth*0.000108500,2), type = "line") %>%
+        hc_add_series(round(HW_finalpredictions$mean*0.000108500,2), type = "line") %>%
+        hc_add_series(round(ARIMA_finalpredictions$mean*0.000108500,2), type = "line")
   
+      
+    })
+    
+    output$analyst_text<-renderText(
+      print("These are your predictions for the next year with two 
+            different models. The proportion of error is between 5% and 10%.")
+    )
+   
 }
-
 
 
 # server <- function(input, output, session) {

@@ -11,13 +11,12 @@ library(highcharter)
 library(dplyr)
 library(lubridate)
 library(plotly)
+library(forecast)
 
 
 #### 1. LOAD OBJECTS ####
 # Prepared data
 data<-readRDS("data.rds")
-ListGraphsMonths<- readRDS("ListGraphMonths.rds")
-ListGraphsWeeks<- readRDS("ListGraphsWeeks.rds")
 prices <- read_excel("Electricity_prices.xlsx")
 prices <-data.frame(prices)
 prices$Month<-month(prices$Month, label=TRUE, abbr=FALSE)
@@ -50,11 +49,12 @@ data_byyears<-data%>%
   ungroup()
 
 # Create time series
-tsYear<-ts(data_byyears[vars],frequency=1, start=2007, end=2010)
-tsMonth<-ts(data_bymonths[vars],frequency =  12, start=c(2007,1),  end=c(2010,11))
-tsWeek<-ts(data_byweeks[vars], frequency = 52, start=c(2007,1),    end=c(2010,48))
-tsDay<-ts(data_bydays[c(vars, "Price")], frequency = 356, start=c(2007,1),    end=c(2010,300))
+# tsYear<-ts(data_byyears[vars],frequency=1, start=2007, end=2010)
+tsMonth<-ts(data_bymonths["ActiveEnergy"],frequency =  12, start=c(2007,1),  end=c(2010,11))
+# tsWeek<-ts(data_byweeks[vars], frequency = 52, start=c(2007,1),    end=c(2010,48))
+# tsDay<-ts(data_bydays[c(vars, "Price")], frequency = 356, start=c(2007,1),    end=c(2010,300))
 rm(vars)
+
 #### 2.  USER INTERFACE ####
 ui <- dashboardPage(
   dashboardHeader(title = "Energy Monitor",
@@ -66,7 +66,7 @@ ui <- dashboardPage(
     sidebarMenu(id="menu",
                 menuItem("Customer Layout", tabName = "customer", icon =icon("bar-chart-o"),
                          startExpanded = TRUE, 
-                         menuSubItem("consumption", tabName="consumption"),
+                         menuSubItem("consumption", tabName="consumption", selected = TRUE),
                          selectInput(inputId = "cust_var", label = "Variable",
                                      choices=c("ActiveEnergy","Kitchen", "Laundry", 
                                                "EWAC")),
@@ -76,13 +76,10 @@ ui <- dashboardPage(
                 
                 menuItem("Analyst Layout", tabName = "analyst", icon =icon("line-chart"), 
                          startExpanded = FALSE,
-                         selectInput(inputId ="FrequencyAnalyst", label="Select frequency", 
-                                     choices=c("Month", "Week")),
-                         selectInput(inputId = "VariableAnalyst", label = "Variable",
-                                     choices=c("ActiveEnergy", "Kitchen", "Laundry", "EWAC")),
-                         menuSubItem("Time Series", tabName = "AnTimeSeries"),
-                         menuSubItem("Time Series All", tabName = "AnTimeSeriesAll"),
-                         menuSubItem("Models", tabName = "AnModels")
+                         # selectInput(inputId = "VariableAnalyst", label = "Variable",
+                         #             choices=c("ActiveEnergy", "Kitchen", "Laundry", "EWAC")),
+                         menuSubItem("Predictions", tabName = "cust_predictions", selected = TRUE)
+
                 )
     )
   ),
@@ -116,38 +113,21 @@ ui <- dashboardPage(
 
               highchartOutput("cust_all")
             )
-              
-            
-    
             
     ),
     
-    tabItem(tabName = "AnTimeSeries",
-            box(plotOutput("TimeSeries", height = 500,width = 700 ))),
-    
-    
-    tabItem(tabName = "AnTimeSeriesAll",
-            box(plotOutput("TimeSeriesAll", height = 500,width = 700))),
-    
-    tabItem(tabName = "AnModels",
-            fluidRow(
-              box(plotOutput("PlotModels", height = 250)),
-              
-              box(
-                title= "SelectModel",
-                selectInput(inputId = "SelectModel", label = "Select Model",choices=c("Naive", "SNaive", "HoltWinters", "Arima"))
-              )),
+    tabItem(tabName = "cust_predictions",
             
-            fluidRow(
-              box(tableOutput("ErrorModel")))
-    ),
+            column(width=8,          
+              highchartOutput("analyst_plot")),
+            
+            column(width=4,
+              textOutput("analyst_text")
+            )
+
     
-    tabItem(tabName = "readme",
-            box(imageOutput("readme"))),
-    
-    tabItem(tabName = "insights",
-            box(textOutput("Insights")))
-    
+
+    )
   )
   
   )
