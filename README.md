@@ -1,5 +1,5 @@
 # SUBMETERING ANALYSIS
-Based on the measurements of electric power consumption over four years in a real household located in Sceaux, we’re going to analzye past behaviour and we’re going to forecast future energy consumption.
+Based on the measurements of electric power consumption over four years in a real household located in Sceaux, we’re going to analyze past behavior and we’re going to forecast future energy consumption.
 
 For this purpose, we're going to use the 
 "Individual household electric power consumption Data Set". It covers over four years in a real household located in Sceaux. You can read more about this dataset [here](https://archive.ics.uci.edu/ml/datasets/individual+household+electric+power+consumption).
